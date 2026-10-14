@@ -1,11 +1,73 @@
 #include "HardwareSerial.h"
 #include "WiFiType.h"
+#include "credentials.h"
 #include "esp32-hal.h"
 #include <Arduino.h>
 #include <WiFi.h>
-#include "credentials.h"
+#include <cstddef>
+#include <cstdint>
+
+#include "lwip/ip_addr.h"
+#include "ping/ping_sock.h"
 
 int status = WL_IDLE_STATUS;
+
+static void on_ping_success(esp_ping_handle_t hdl, void *args) {
+  uint8_t ttl;
+  uint16_t seqno;
+  uint32_t elapsed_time, recv_len;
+  ip_addr_t target_addr;
+  esp_ping_get_profile(hdl, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
+  esp_ping_get_profile(hdl, ESP_PING_PROF_TTL, &ttl, sizeof(ttl));
+  esp_ping_get_profile(hdl, ESP_PING_PROF_IPADDR, &target_addr,
+                       sizeof(target_addr));
+  esp_ping_get_profile(hdl, ESP_PING_PROF_SIZE, &recv_len, sizeof(recv_len));
+  esp_ping_get_profile(hdl, ESP_PING_PROF_TIMEGAP, &elapsed_time,
+                       sizeof(elapsed_time));
+  printf("%lu bytes from %s icmp_seq=%d ttl=%d time=%lu ms\n", recv_len,
+         ipaddr_ntoa(&target_addr), seqno, ttl, elapsed_time);
+}
+
+static void on_ping_timeout(esp_ping_handle_t hdl, void *args) {
+  uint16_t seqno;
+  ip_addr_t target_addr;
+  esp_ping_get_profile(hdl, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
+  esp_ping_get_profile(hdl, ESP_PING_PROF_IPADDR, &target_addr,
+                       sizeof(target_addr));
+  printf("From %s icmp_seq=%d timeout\n", ipaddr_ntoa(&target_addr), seqno);
+}
+
+static void on_ping_end(esp_ping_handle_t hdl, void *args) {
+  uint32_t transmitted;
+  uint32_t received;
+  uint32_t total_time_ms;
+
+  esp_ping_get_profile(hdl, ESP_PING_PROF_REQUEST, &transmitted,
+                       sizeof(transmitted));
+  esp_ping_get_profile(hdl, ESP_PING_PROF_REPLY, &received, sizeof(received));
+  esp_ping_get_profile(hdl, ESP_PING_PROF_DURATION, &total_time_ms,
+                       sizeof(total_time_ms));
+  printf("%d packets transmitted, %d received, time %dms\n", transmitted,
+         received, total_time_ms);
+
+  esp_ping_delete_session(hdl);
+}
+
+void initialize_ping() {
+  esp_ping_config_t config = ESP_PING_DEFAULT_CONFIG();
+  config.count = 4;
+  config.interval_ms = 2000;
+  ipaddr_aton("10.128.246.157", &config.target_addr);
+  esp_ping_callbacks_t cbs;
+  cbs.cb_args = NULL;
+  cbs.on_ping_success = on_ping_success;
+  cbs.on_ping_end = on_ping_end;
+  cbs.on_ping_timeout = on_ping_timeout;
+
+  esp_ping_handle_t ping;
+  esp_ping_new_session(&config, &cbs, &ping);
+  esp_ping_start(ping);
+}
 
 // Startup - Start serial output for monitoring, Connect to Wifi
 void setup() {
@@ -23,8 +85,15 @@ void setup() {
     delay(5000);
   }
 
-  Serial.println("Success!\nYou are connected to: " + WiFi.SSID()); // Connected!
+  Serial.println("Success!\nYou are connected to: " +
+                 WiFi.SSID()); // Connected!
   Serial.println("Ip Address: " + WiFi.localIP().toString());
+
+
 }
 
-void loop() {}
+void loop() {
+
+  initialize_ping();
+  delay(20000);
+}
