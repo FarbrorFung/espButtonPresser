@@ -1,7 +1,4 @@
-#include "HardwareSerial.h"
-#include "WiFiType.h"
 #include "credentials.h"
-#include "esp32-hal.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <cstddef>
