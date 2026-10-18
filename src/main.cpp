@@ -95,6 +95,7 @@ void setup() {
 
   // Setup the servo
   myServo.attach(22);
+  myServo.write(0);
 
   // Begin connectig to Wifi.
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
