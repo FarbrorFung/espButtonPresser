@@ -11,7 +11,6 @@
 #include <ESP32Servo.h>
 
 Servo myServo;
-int pos = 0;
 
 int status = WL_IDLE_STATUS;
 
@@ -44,7 +43,7 @@ static void on_ping_end(esp_ping_handle_t hdl, void *args) {
   uint32_t transmitted;
   uint32_t received;
   uint32_t total_time_ms;
-
+  int pos;
   esp_ping_get_profile(hdl, ESP_PING_PROF_REQUEST, &transmitted,
                        sizeof(transmitted));
   esp_ping_get_profile(hdl, ESP_PING_PROF_REPLY, &received, sizeof(received));
@@ -118,7 +117,7 @@ void loop() {
     delay(CHECK_INTERVAL);
   }
 
-  status = WiFi.status(); //This runs if Wifi drops.
+  status = WiFi.status(); // This runs if Wifi drops.
 
   while (status != WL_CONNECTED) {
     status = WiFi.status();
