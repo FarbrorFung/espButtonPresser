@@ -113,7 +113,7 @@ void setup() {
 void loop() {
   while (WiFi.status() == WL_CONNECTED) {
     initialize_ping();
-    delay(20000);
+    delay(CHECK_INTERVAL);
   }
 
   status = WiFi.status(); //This runs if Wifi drops.
