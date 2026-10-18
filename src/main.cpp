@@ -1,4 +1,5 @@
 #include "credentials.h"
+#include "servo_config.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <cstddef>
@@ -94,7 +95,7 @@ void setup() {
   Serial.println("Program Started!");
 
   // Setup the servo
-  myServo.attach(22);
+  myServo.attach(SERVO_PIN);
   myServo.write(0);
 
   // Begin connectig to Wifi.
