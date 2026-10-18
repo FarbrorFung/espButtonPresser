@@ -68,13 +68,13 @@ static void on_ping_end(esp_ping_handle_t hdl, void *args) {
 
   esp_ping_delete_session(hdl);
 
-  // Move servo
+  // Move servo if all pings timeout
   if (received == 0) {
     if (WiFi.status() != WL_CONNECTED) {
       return;
     }
-    push_the_button();
     Serial.println("Failed to receive packets, triggering servo!");
+    push_the_button();
   }
 }
 
