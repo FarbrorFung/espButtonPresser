@@ -18,6 +18,17 @@ AsyncWebServer server(80);
 
 int status = WL_IDLE_STATUS;
 
+void push_the_button() {
+  int pos;
+  for (pos = 0; pos <= SERVO_ANGLE; pos += 1) {
+    myServo.write(pos);
+    delay(15);
+  }
+  delay(200);
+  myServo.write(0);
+  Serial.println("Button hopefully pushed");
+}
+
 static void on_ping_success(esp_ping_handle_t hdl, void *args) {
   uint8_t ttl;
   uint16_t seqno;
@@ -47,7 +58,6 @@ static void on_ping_end(esp_ping_handle_t hdl, void *args) {
   uint32_t transmitted;
   uint32_t received;
   uint32_t total_time_ms;
-  int pos;
   esp_ping_get_profile(hdl, ESP_PING_PROF_REQUEST, &transmitted,
                        sizeof(transmitted));
   esp_ping_get_profile(hdl, ESP_PING_PROF_REPLY, &received, sizeof(received));
@@ -63,14 +73,8 @@ static void on_ping_end(esp_ping_handle_t hdl, void *args) {
     if (WiFi.status() != WL_CONNECTED) {
       return;
     }
+    push_the_button();
     Serial.println("Failed to receive packets, triggering servo!");
-    for (pos = 0; pos <= SERVO_ANGLE; pos += 1) {
-      myServo.write(pos);
-      delay(15);
-    }
-    delay(200);
-    myServo.write(0);
-    Serial.println("Button hopefully pushed");
   }
 }
 
@@ -114,8 +118,7 @@ void setup() {
                  WiFi.SSID()); // Connected!
   Serial.println("Ip Address: " + WiFi.localIP().toString());
 
-  //Setup Webserver
-  
+  // Setup Webserver
 }
 
 void loop() {
