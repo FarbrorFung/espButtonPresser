@@ -60,7 +60,7 @@ static void on_ping_end(esp_ping_handle_t hdl, void *args) {
       return;
     }
     Serial.println("Failed to receive packets, triggering servo!");
-    for (pos = 0; pos <= 30; pos += 1) {
+    for (pos = 0; pos <= SERVO_ANGLE; pos += 1) {
       myServo.write(pos);
       delay(15);
     }
