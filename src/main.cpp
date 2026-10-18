@@ -9,6 +9,9 @@
 
 #include <ESP32Servo.h>
 
+Servo myServo;
+int pos = 0;
+
 int status = WL_IDLE_STATUS;
 
 static void on_ping_success(esp_ping_handle_t hdl, void *args) {
@@ -50,13 +53,28 @@ static void on_ping_end(esp_ping_handle_t hdl, void *args) {
          received, total_time_ms);
 
   esp_ping_delete_session(hdl);
+
+  // Move servo
+  if (received == 0) {
+    if (WiFi.status() != WL_CONNECTED) {
+      return;
+    }
+    Serial.println("Failed to receive packets, triggering servo!");
+    for (pos = 0; pos <= 30; pos += 1) {
+      myServo.write(pos);
+      delay(15);
+    }
+    delay(200);
+    myServo.write(0);
+    Serial.println("Button hopefully pushed");
+  }
 }
 
 void initialize_ping() {
   esp_ping_config_t config = ESP_PING_DEFAULT_CONFIG();
   config.count = 4;
   config.interval_ms = 2000;
-  ipaddr_aton("10.128.246.157", &config.target_addr);
+  ipaddr_aton(IP_TO_PING, &config.target_addr);
   esp_ping_callbacks_t cbs;
   cbs.cb_args = NULL;
   cbs.on_ping_success = on_ping_success;
@@ -75,6 +93,9 @@ void setup() {
   delay(2000); // delay so esp don't print before monitor is connected.
   Serial.println("Program Started!");
 
+  // Setup the servo
+  myServo.attach(22);
+
   // Begin connectig to Wifi.
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
@@ -87,12 +108,19 @@ void setup() {
   Serial.println("Success!\nYou are connected to: " +
                  WiFi.SSID()); // Connected!
   Serial.println("Ip Address: " + WiFi.localIP().toString());
-
-
 }
 
 void loop() {
+  while (WiFi.status() == WL_CONNECTED) {
+    initialize_ping();
+    delay(20000);
+  }
 
-  initialize_ping();
-  delay(20000);
+  status = WiFi.status(); //This runs if Wifi drops.
+
+  while (status != WL_CONNECTED) {
+    status = WiFi.status();
+    Serial.println("Not Connected, retrying!");
+    delay(5000);
+  }
 }
