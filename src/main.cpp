@@ -12,6 +12,10 @@
 
 Servo myServo;
 
+#include <ESPAsyncWebServer.h>
+
+AsyncWebServer server(80);
+
 int status = WL_IDLE_STATUS;
 
 static void on_ping_success(esp_ping_handle_t hdl, void *args) {
@@ -109,6 +113,9 @@ void setup() {
   Serial.println("Success!\nYou are connected to: " +
                  WiFi.SSID()); // Connected!
   Serial.println("Ip Address: " + WiFi.localIP().toString());
+
+  //Setup Webserver
+  
 }
 
 void loop() {
