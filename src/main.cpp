@@ -7,6 +7,8 @@
 #include "lwip/ip_addr.h"
 #include "ping/ping_sock.h"
 
+#include <ESP32Servo.h>
+
 int status = WL_IDLE_STATUS;
 
 static void on_ping_success(esp_ping_handle_t hdl, void *args) {
