@@ -2,3 +2,4 @@
 .vscode/
 compile_commands.json
 include/credentials.h
+include/servo_config.h
