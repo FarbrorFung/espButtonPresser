@@ -16,7 +16,15 @@ Servo myServo;
 
 AsyncWebServer server(80);
 
+// GLOBAL VARIABLES
+
 int status = WL_IDLE_STATUS;
+volatile int transmitted_counts = 0;
+volatile int received_counts = 0;
+volatile int button_press_count = 0;
+
+volatile unsigned long when_was_button_pressed;
+volatile unsigned long last_check;
 
 void push_the_button() {
   int pos;
@@ -25,8 +33,10 @@ void push_the_button() {
     delay(15);
   }
   delay(200);
+  when_was_button_pressed = millis();
   myServo.write(0);
   Serial.println("Button hopefully pushed");
+  button_press_count += 1;
 }
 
 static void on_ping_success(esp_ping_handle_t hdl, void *args) {
@@ -41,7 +51,8 @@ static void on_ping_success(esp_ping_handle_t hdl, void *args) {
   esp_ping_get_profile(hdl, ESP_PING_PROF_SIZE, &recv_len, sizeof(recv_len));
   esp_ping_get_profile(hdl, ESP_PING_PROF_TIMEGAP, &elapsed_time,
                        sizeof(elapsed_time));
-  printf("%lu bytes from %s icmp_seq=%d ttl=%d time=%lu ms\n", recv_len,
+
+  printf("%iu bytes from %s icmp_seq=%d ttl=%d time=%i ms\n", recv_len,
          ipaddr_ntoa(&target_addr), seqno, ttl, elapsed_time);
 }
 
@@ -65,6 +76,10 @@ static void on_ping_end(esp_ping_handle_t hdl, void *args) {
                        sizeof(total_time_ms));
   printf("%d packets transmitted, %d received, time %dms\n", transmitted,
          received, total_time_ms);
+
+  transmitted_counts += transmitted;
+  received_counts += received;
+  last_check = millis();
 
   esp_ping_delete_session(hdl);
 
@@ -107,7 +122,6 @@ void setup() {
 
   // Begin connectig to Wifi.
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
   while (status != WL_CONNECTED) { // Connection loop
     status = WiFi.status();
     Serial.println("Not Connected");
@@ -118,7 +132,25 @@ void setup() {
                  WiFi.SSID()); // Connected!
   Serial.println("Ip Address: " + WiFi.localIP().toString());
 
-  // Setup Webserver
+  // Setup Webserver routes
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", "hello");
+  });
+  server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+    AsyncResponseStream *response = request->beginResponseStream("text/plain");
+    response->printf("Packets Transmitted: %i\n", transmitted_counts);
+    response->printf("Packets Received: %i\n", received_counts);
+    response->printf("Button Presses: %i\n", button_press_count);
+    if (button_press_count > 0) {
+      response->printf("Time since last button press: %lu s\n",
+                       (millis() - when_was_button_pressed) / 1000);
+    }
+    response->printf("Last checked: %lu s ago\n",
+                     (millis() - last_check) / 1000);
+    request->send(response);
+  });
+  server.begin();
+  Serial.println("Server should be started");
 }
 
 void loop() {
