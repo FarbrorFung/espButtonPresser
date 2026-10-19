@@ -1,4 +1,11 @@
+#include "AsyncEventSource.h"
+#include "HardwareSerial.h"
+#include "IPAddress.h"
+#include "WiFiGeneric.h"
+#include "WiFiType.h"
 #include "credentials.h"
+#include "esp32-hal.h"
+#include "esp_wifi_types.h"
 #include "servo_config.h"
 #include <Arduino.h>
 #include <WiFi.h>
@@ -15,6 +22,7 @@ Servo myServo;
 #include <ESPAsyncWebServer.h>
 
 AsyncWebServer server(80);
+AsyncEventSource events("/events");
 
 // GLOBAL VARIABLES
 
@@ -25,6 +33,8 @@ volatile int button_press_count = 0;
 
 volatile unsigned long when_was_button_pressed;
 volatile unsigned long last_check;
+unsigned long last_connection_attempt;
+bool autoreconnect_block;
 
 void push_the_button() {
   int pos;
@@ -37,6 +47,16 @@ void push_the_button() {
   myServo.write(0);
   Serial.println("Button hopefully pushed");
   button_press_count += 1;
+}
+
+void reconnect_to_wifi() {
+
+  if (millis() - last_connection_attempt > 30000) {
+
+    Serial.println("Trying to reconnect to WiFi... the manual way...");
+    WiFi.reconnect();
+    last_connection_attempt = millis();
+  }
 }
 
 static void on_ping_success(esp_ping_handle_t hdl, void *args) {
@@ -109,6 +129,23 @@ void initialize_ping() {
   esp_ping_start(ping);
 }
 
+void wifi_drops_connection(WiFiEvent_t event, WiFiEventInfo_t info) {
+  const char *reason_string = WiFi.disconnectReasonName(
+      (wifi_err_reason_t)info.wifi_sta_disconnected.reason);
+  Serial.println("Dropped Connection: " + String(reason_string));
+  if (String(reason_string) == "AUTH_FAIL") {
+    autoreconnect_block = true;
+  } else {
+    autoreconnect_block = false;
+  }
+}
+
+void wifi_got_ip(WiFiEvent_t event, WiFiEventInfo_t info) {
+  Serial.println("WiFi Connected!");
+  Serial.println("IP Address: " +
+                 IPAddress(info.got_ip.ip_info.ip.addr).toString());
+}
+
 // Startup - Start serial output for monitoring, Connect to Wifi
 void setup() {
   // Serial Connection.
@@ -121,8 +158,14 @@ void setup() {
   myServo.write(0);
 
   // Begin connectig to Wifi.
+  WiFi.setAutoReconnect(true);
+  WiFi.onEvent(wifi_drops_connection,
+               WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  WiFi.onEvent(wifi_got_ip, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP);
+  last_connection_attempt = millis();
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (status != WL_CONNECTED) { // Connection loop
+
+  /*while (status != WL_CONNECTED) { // Connection loop
     status = WiFi.status();
     Serial.println("Not Connected");
     delay(5000);
@@ -131,7 +174,7 @@ void setup() {
   Serial.println("Success!\nYou are connected to: " +
                  WiFi.SSID()); // Connected!
   Serial.println("Ip Address: " + WiFi.localIP().toString());
-
+*/
   // Setup Webserver routes
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", "hello");
@@ -149,21 +192,31 @@ void setup() {
                      (millis() - last_check) / 1000);
     request->send(response);
   });
+
+  server.addHandler(&events);
+
   server.begin();
-  Serial.println("Server should be started");
+  Serial.println("Webserver should be started");
 }
 
 void loop() {
-  while (WiFi.status() == WL_CONNECTED) {
-    initialize_ping();
-    delay(CHECK_INTERVAL);
-  }
 
-  status = WiFi.status(); // This runs if Wifi drops.
-
-  while (status != WL_CONNECTED) {
-    status = WiFi.status();
-    Serial.println("Not Connected, retrying!");
-    delay(5000);
+  if (WiFi.status() != WL_CONNECTED && autoreconnect_block == true){
+    reconnect_to_wifi();
   }
+  /*  while (WiFi.status() == WL_CONNECTED) {
+
+      events.send("Ping started", "log");
+
+      initialize_ping();
+      delay(CHECK_INTERVAL);
+    }
+  */
+  // status = WiFi.status(); // This runs if Wifi drops.
+  /* while (status != WL_CONNECTED) {
+     status = WiFi.status();
+     Serial.println("Not Connected, retrying!");
+     WiFi.reconnect();
+     delay(10000);
+   }*/
 }
